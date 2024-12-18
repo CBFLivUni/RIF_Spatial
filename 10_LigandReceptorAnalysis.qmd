@@ -1,0 +1,213 @@
+---
+title: "Ligand-receptor signalling inference"
+author: Jamie Soul
+date: today
+date-format: short
+format:
+  html:
+    self-contained: true
+    theme: litera
+    toc: true
+editor: visual
+code-block-bg: true
+code-block-border-left: "#31BAE9"
+---
+
+# Ligand-receptor signalling inference
+
+This notebook uses NicheNet to infer the ligand receptor signals between the regions
+
+## Load libraries
+
+```{r}
+#| output: false
+library(NanoStringNCTools)
+library(tidyverse)
+library(RColorBrewer)
+library(cowplot)
+library(ggpubr)
+library(writexl)
+library(ComplexHeatmap)
+library(patchwork)
+library(Seurat)
+library(circlize)
+
+source("src/utilityFunctionsExtended.R")
+set.seed(123)
+options(timeout = 100000000000)
+```
+
+## Highlight ligand receptor interactions with differential expression
+```{r}
+#load the normalised expressed data
+target_spatialData <- readRDS("results/normalisedSpatialData.RDS")
+
+pData(target_spatialData)$segment <- paste(word(pData(target_spatialData)$Region,2),pData(target_spatialData)$segment,sep="_")
+
+segments <- unique(pData(target_spatialData)$segment)
+
+
+target_spatialData <- target_spatialData[ target_spatialData$Disease == "Control",]
+
+#function to define the expression genes (ligands and receptors) in a region
+getGeneExpression <- function(region, dat, targets, threshold=2){
+  
+  # Filter by region
+  dat <- dat[ ,pData(dat)$segment %in% region] %>%
+assayDataApply(2, FUN = log, base = 2, elt = "q_norm")
+  
+  dat <- sapply(targets, function(ligands,dat){
+    
+    genes <- unlist(strsplit(ligands,split = "_"))
+    
+   if(!all(genes %in% rownames(dat))) return(NA)
+    
+    expression <- min(rowMeans(as.data.frame(dat[genes,])))
+    
+    return(expression)
+    
+  },dat)
+  
+  return(dat)
+}
+
+getInteractionExpression <- function(interactions,ligandExp,receptorExp){
+  scores <- apply(interactions,1,function(interaction) {
+    
+      ligandExp[interaction["source_genesymbol"]] + receptorExp[interaction["target_genesymbol"]]
+    
+  })
+  
+  return(scores)
+}
+
+# Get the combinations of the cell types
+combinations <- expand.grid(segments,segments)
+colnames(combinations) <- c("sender","receiver")
+combinations <- combinations[ combinations$sender != combinations$receiver,]
+combinations <- combinations %>%
+filter(
+(grepl("Luminal", sender) & grepl("Luminal", receiver)) |
+(grepl("Glandular", sender) & grepl("Glandular", receiver))
+) %>% as.data.frame()
+  
+  
+# Get curated lr table from omnipath
+lr <- read.delim("data/lr.txt")
+
+#get the expressed genes
+expressedReceptors <- segments %>% map(getGeneExpression,target_spatialData,unique(lr$source_genesymbol))
+names(expressedReceptors) <- segments
+
+expressedLigands <- segments %>% map(getGeneExpression,target_spatialData,unique(lr$target_genesymbol))
+names(expressedLigands) <- segments
+
+
+interactionScores <- apply(combinations,1,function(x) {
+  
+res <- as.data.frame(getInteractionExpression(lr,expressedReceptors[[x[1]]],expressedLigands[[x[2]]]))
+colnames(res)[1] <- "Score"
+res$ligand <- x[1]
+res$receptor <- x[2]
+res <- res[,c(2:3,1)]
+res <- cbind(res,lr[,3:4])
+return(res)
+})
+
+interactionScores <- bind_rows(interactionScores)
+interactionScores <- interactionScores[!is.na(interactionScores$Score),]
+
+# add diff exp genes
+diffExp <- readRDS("results/diffExpLME4_Q3.RDS")
+diffExpSig <- diffExp[ diffExp$FDR < 0.05 & abs(diffExp$Estimate) > log2(1.5),]
+
+interactionScores$receptorSig<- ifelse(
+  sapply(strsplit(interactionScores$target_genesymbol, "_"), function(x) any(x %in% diffExpSig$Gene)),
+  "Yes", 
+  "No"
+)
+
+interactionScores$ligandSig<- ifelse(
+  sapply(strsplit(interactionScores$source_genesymbol, "_"), function(x) any(x %in% diffExpSig$Gene)),
+  "Yes", 
+  "No"
+)
+
+interactionScoresSig <- interactionScores[ interactionScores$receptorSig=="Yes" | interactionScores$ligandSig== "Yes",]
+
+
+getDiffExp <- function(interaction,diffExp){
+  
+  
+  ligandRegion <- unlist(strsplit(x = as.character(interaction["ligand"]),split = "_")) 
+   receptorRegion <- unlist(strsplit(x = as.character(interaction["receptor"]),split = "_")) 
+   
+  ligandRegion <- paste(ligandRegion,collapse=" ")
+  ligand <- unlist(strsplit(as.character(interaction["source_genesymbol"]),split="_"))
+  
+  
+  
+  ligandFC <- diffExp[diffExp$Gene %in% ligand & grepl(ligandRegion,diffExp$Contrast,ignore.case = TRUE) ,c("Estimate","FDR"),]
+  ligandFC <- ligandFC[which.min(ligandFC$FDR),]
+  
+  receptorRegion <- paste(receptorRegion,collapse=" ")
+  receptor <- unlist(strsplit(as.character(interaction["target_genesymbol"]),split="_"))
+  receptorFC <- diffExp[ diffExp$Gene %in% receptor & grepl(receptorRegion,diffExp$Contrast,ignore.case = TRUE) ,c("Estimate","FDR")]
+  receptorFC <- receptorFC[which.min(receptorFC$FDR),]
+  
+  
+  res <- data.frame(ligandFC=ligandFC$Estimate,ligandFDR=ligandFC$FDR,receptorFC=receptorFC$Estimate,receptorFDR=receptorFC$FDR)
+  
+  return(res)
+  
+  
+}
+
+
+interactionDiffExp <- bind_rows(apply(interactionScoresSig,1,getDiffExp,diffExp))
+
+interactionDiffExp <- cbind(interactionScoresSig,interactionDiffExp)
+
+interactionDiffExpSig <- interactionDiffExp[interactionDiffExp$ligandFDR<0.05 |  interactionDiffExp$receptorFDR<0.05, ]
+
+interactionDiffExpSig$Sum <- abs(interactionDiffExpSig$ligandFC + interactionDiffExpSig$receptorFC)
+
+ colnames(interactionDiffExpSig)[1:5] <- c("sender","receiver","Score","ligand","receptor")
+ 
+ write_xlsx(interactionDiffExpSig,path = "tables/SupplementryTable9.xlsx")
+
+```
+
+### Visualise
+
+```{r}
+colors_sender = setNames(c("#E64B35FF", "#3C5488FF", "#00A087FF"), c("Luminal_CD45"   ,"Luminal_STROMA", "Luminal_PANCK"))
+  colors_receiver = setNames(c("#E64B35FF", "#3C5488FF", "#00A087FF"), c("Luminal_CD45"  ,"Luminal_STROMA", "Luminal_PANCK"))
+  
+  data <- interactionDiffExpSig[ !grepl("Glandular",interactionDiffExpSig$sender),]
+  
+  data <- data[order(abs(data$Sum),decreasing=TRUE),][1:50,]
+  circos_luminal <- produceCircosPlot(data,colors_sender,colors_receiver)
+  
+  pdf(file = "figures/pathways/circos_luminal.pdf", width = 9, height = 10)
+circos_luminal$circos
+circos_luminal$legend
+dev.off()
+```
+
+
+```{r}
+colors_sender = setNames(c( "#4DBBD5FF", "#3C5488FF", "#00A087FF"), c("Glandular_CD56"   ,"Glandular_STROMA", "Glandular_PANCK"))
+  colors_receiver = setNames(c( "#4DBBD5FF", "#3C5488FF", "#00A087FF"), c("Glandular_CD56"  ,"Glandular_STROMA", "Glandular_PANCK"))
+
+    data <- interactionDiffExpSig[ grepl("Glandular",interactionDiffExpSig$sender ),]
+  data <- data[order(abs(data$Sum),decreasing=TRUE),][1:50,]
+
+ circos_glandular <- produceCircosPlot(data,colors_sender,colors_receiver)
+  
+    pdf(file = "figures/pathways/circos_glandular.pdf", width = 9, height = 10)
+circos_glandular$circos
+circos_glandular$legend
+dev.off()
+
+```

@@ -1,0 +1,156 @@
+---
+title: "Drug transcriptomic similarity"
+author: Jamie Soul
+format:
+  html:
+    self-contained: true
+    theme: litera
+    toc: true
+editor: visual
+code-block-bg: true
+code-block-border-left: "#31BAE9"
+---
+
+# LINCSL1000 drug similarity
+
+# 
+
+## Load libraries
+
+```{r}
+#| output: false
+library(tidyverse)
+library(cowplot)
+library(signatureSearch)
+library(ExperimentHub)
+library(rhdf5)
+library(org.Hs.eg.db)
+library(gt)
+
+source("src/utilityFunctionsExtended.R")
+
+```
+
+## Load the differential expression data
+
+```{r}
+betweenDiseases <- readRDS("results/diffExpLME4_Q3.RDS")
+betweenDiseases <- betweenDiseases %>%  named_group_split(Contrast) %>% map(as.data.frame)
+
+```
+
+## Between disease
+
+```{r}
+#| eval: true
+#| echo: true
+
+#load lincs
+eh <- ExperimentHub()
+db <- eh[["EH3226"]]
+
+#function to calculate the transcriptomic similarity of gene expression response and the database of drug signatures
+calculateSim <- function(diffExp,db,method="Cor"){
+  
+eg2gene <- AnnotationDbi::select(org.Hs.eg.db,diffExp$Gene, c("ENTREZID", "SYMBOL"),"SYMBOL")
+eg2gene <- na.omit(eg2gene)
+diffExp <- merge(diffExp,eg2gene,by.x="Gene",by.y="SYMBOL")
+
+if(method=="Cor"){
+input <- data.frame(row.names = diffExp$ENTREZID,log2FC=diffExp$Estimate)
+qsig_lincs <- qSig(query=as.matrix(input), 
+                   gess_method="Cor", refdb=db)
+lincs <- signatureSearch::gess_cor(qsig_lincs,workers = 3)
+}
+
+if(method=="LINCS"){
+  diffExp <- diffExp[ diffExp$FDR <= 0.05,]
+  up <- diffExp %>% dplyr::slice_max(Estimate,n=300) %>% pull(ENTREZID)
+  down <- diffExp %>% dplyr::slice_min(Estimate,n=300) %>% pull(ENTREZID)
+  qsig_lincs <- qSig(query=list(upset=up, downset=down), 
+                     gess_method="LINCS", refdb=db)
+  lincs <- gess_lincs(qsig_lincs, sortby="NCS", tau=TRUE, workers=3)
+}
+
+return(lincs)
+
+}
+
+#calculate the drug transcriptomics similarity with the cor method in the lincs db
+drugSim <- betweenDiseases %>% map(calculateSim,db)
+
+#extract the results and write to excel
+drugSim %>% map(result) %>% map(~arrange(.x,cor_score)) %>% writexl::write_xlsx( path = "results/signatureSearch_Full.xlsx", col_names = TRUE)
+
+#filter based on moa data
+data('clue_moa_list')
+touchstone_data <- unlist(clue_moa_list)
+
+# filter drugs
+drugSim %>% map(result) %>% map(~dplyr::filter(.x,pert %in% touchstone_data)) %>%
+ map(~arrange(.x,cor_score)) %>%
+writexl::write_xlsx(path ="results/signatureSearch_Touchstone.xlsx", col_names = TRUE)
+
+#top 5 drugs per comparison
+topHits <- drugSim %>% map(result) %>% map(~dplyr::filter(.x,pert %in% touchstone_data)) %>%
+ map(~arrange(.x,cor_score)) %>% map(~slice_head(.x,n=5)) %>% bind_rows(.id = "Comparison") %>% dplyr::select(-c(type,cell,trend,PCIDss)) %>% mutate(cor_score=signif(cor_score,3)) %>% arrange(cor_score) %>%  gt() %>% gtsave("tables/Table2.docx")
+
+#rename(c("Compound"="pert","Compound targets"="t_gn_sym","MOA"="MOAss"))
+```
+
+## GSEA of targets
+
+```{r}
+
+getGSEA <- function(drugSim){
+  drugs <- result(drugSim)%>% group_by(pert) %>%
+  slice_max(abs(cor_score))
+drugsList <- drugs$cor_score
+names(drugsList) <- drugs$pert
+drugsList <- sort(drugsList,decreasing = TRUE)
+
+dsea_GSEA_KEGG <- dsea_GSEA(drugList = drugsList, type="KEGG",exponent=1, 
+                          nPerm=10000, pvalueCutoff=1, minGSSize=2)
+
+dsea_GSEA_GOBP <- dsea_GSEA(drugList = drugsList, type="GO",ont="BP",exponent=1, 
+                          nPerm=10000, pvalueCutoff=1, minGSSize=2)
+
+return(list(kegg=result(dsea_GSEA_KEGG),GOBP=result(dsea_GSEA_GOBP)))
+}
+
+enrichment <- drugSim %>% map(getGSEA)
+
+kegg <- lapply(enrichment,"[[",1)
+gobp <- lapply(enrichment,"[[",2)
+
+kegg <- bind_rows(kegg,.id = "group")
+gobp <- bind_rows(gobp,.id = "group")
+
+writexl::write_xlsx(list(kegg=kegg,gobp=gobp),path="results/drugTargetEnrichment.xlsx")
+
+#function to plot a dotplot of enrichment results
+plotPathwayDotPlot <- function(enrichmentTable,title){
+  enrichmentTable <- enrichmentTable %>% group_by(group) %>% slice_max(abs(NES),n=10) %>%
+     mutate(Description = fct_reorder(Description,NES))
+  
+  ggplot(enrichmentTable, aes(x=NES, y=Description, size=setSize,color=p.adjust)) +
+        geom_point() + theme_cowplot(18) +
+        scale_size(range=c(3, 8)) +
+        guides(size  = guide_legend(order = 1),
+               color = guide_colorbar(order = 2)) +
+    ggtitle(title)
+  
+}
+
+
+keggPlot <- plotPathwayDotPlot(kegg,"KEGG")
+GOBPPlot <- plotPathwayDotPlot(gobp,"GO Biological process")
+
+saveRDS(list(keggPlot,GOBPPlot),file="results/Fig5_DrugEnrichmentPathways.RDS")
+
+save_plot("figures/Drugs/keggPathways.png",keggPlot,bg="white",base_height = 6,base_width = 8)
+save_plot("figures/Drugs/GOBPPathways.png",GOBPPlot,bg="white",base_height = 6,base_width = 8)
+
+
+
+```

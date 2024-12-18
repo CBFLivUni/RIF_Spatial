@@ -1,0 +1,134 @@
+---
+title: "Differential Expression Analysis - Cell Type"
+author: Jamie Soul
+format:
+  html:
+    self-contained: true
+    theme: litera
+    toc: true
+editor: visual
+code-block-bg: true
+code-block-border-left: "#31BAE9"
+---
+
+# Differential expression analysis
+
+## Load libraries
+
+```{r}
+#| output: false
+library(NanoStringNCTools)
+library(GeomxTools)
+library(GeoMxWorkflows)
+library(tidyverse)
+library(cowplot)
+library(factoextra)
+library(gplots)
+library(reshape2)
+library(pheatmap)
+library(writexl)
+library(ggrepel)
+library(patchwork)
+library(edgeR)
+library(limma)
+library(statmod)
+library(BiocParallel)
+library(variancePartition)
+library(ggvenn)
+library(GeoDiff)
+library(UpSetR)
+library(ComplexHeatmap)
+library(RColorBrewer)
+library(ggsci)
+
+source("src/utilityFunctionsExtended.R")
+```
+
+## Load the data
+
+```{r}
+target_spatialData <- readRDS("results/normalisedSpatialData.RDS")
+
+diffExp <- readRDS("results/diffExpLME4_Q3_all.RDS")
+contrasts <- read.delim("data/tissueContrasts.txt",header=FALSE)
+
+
+diffExp <- diffExp[ diffExp$Contrast %in% contrasts$V1,]
+
+assayDataElement(object = target_spatialData, elt = "log_q") <-
+    assayDataApply(target_spatialData, 2, FUN = log, base = 2, elt = "q_norm")
+
+diffExp$meanExp <- rowMeans(assayDataElement(target_spatialData, elt = "log_q"))
+
+saveRDS(diffExp,file="results/diffExpLME4_Q3_betweenCellTypes.RDS")
+
+GOI <- diffExp %>% group_by(Contrast) %>%
+  slice_max(abs(Estimate),n=4) %>% pull(Gene) %>% unique()
+
+#add known validated markers
+GOI <- c(GOI,"AGR3","MUC1")
+
+diffExp <- diffExp %>%  named_group_split(Contrast) %>% map(as.data.frame)
+diffExpOut <- diffExp
+names(diffExpOut) <- gsub("Control ","",names(diffExp))
+names(diffExpOut) <- gsub("Luminal ","LUM_",names(diffExpOut))
+names(diffExpOut) <- gsub("Glandular ","GLAND_",names(diffExpOut))
+
+write_xlsx(diffExpOut,path = "results/diffExpLME4_betweenCells.xlsx" )
+
+
+```
+
+## Heatmap of cell markers
+
+```{r}
+pData(target_spatialData)$Tissue <- word(pData(target_spatialData)$Region,2)
+pData(target_spatialData)$Type <- word(pData(target_spatialData)$Region,2,3)
+
+target_spatialData <- target_spatialData[,order(pData(target_spatialData)$segment,pData(target_spatialData)$Type,pData(target_spatialData)$Disease)]
+
+
+columns <- c("Segment tags", "Disease","Tissue")
+
+df <- pData(target_spatialData)[, columns]
+df <- df %>% mutate(`Segment tags`=
+  case_when(`Segment tags`=="CD45" ~ "CD45+",
+            `Segment tags`=="CD56" ~ "CD56+",
+            `Segment tags`=="PanCK" ~ "PanCK+",
+            .default = as.character(`Segment tags`)))
+
+annotationColours <- mapply(function(column,colourSet) makeColours(df[, column],colourSet),columns,c("nrc","Set2","Set3"),SIMPLIFY = FALSE)
+names(annotationColours) <- columns
+
+column_ha = HeatmapAnnotation( df = df,col=annotationColours)
+
+
+GOI <- c(GOI,"FOXA2","MME")
+
+mat_scaled <- t(scale(t(log2(assayDataElement(target_spatialData[GOI, ], elt = "q_norm")))))
+
+p <- Heatmap(mat_scaled, name="zscore" ,show_column_names = FALSE, top_annotation=column_ha,cluster_columns = FALSE)
+
+saveRDS(p,file="results/Fig2B_Heatmap.RDS")
+
+
+png("figures/DiffExp/betweenCellsHeatmap.png",width = 7,height=5,res=600,units="in")
+p
+dev.off()
+
+p
+
+```
+
+## Volcano Plots
+
+```{r}
+#| fig-height: 22
+#| fig-width: 6
+volcanoPlots <- diffExp %>% map2(names(diffExp),plotVolcano,foldChangeColumn="Estimate",FDRColumn="FDR") %>%  plot_grid(plotlist = . ,ncol = 1)
+
+
+save_plot(plot = volcanoPlots, filename = "figures/DiffExp/CellTypeVolcanoPlot.png",base_height = 22,base_width = 6,bg="white")
+
+volcanoPlots
+```

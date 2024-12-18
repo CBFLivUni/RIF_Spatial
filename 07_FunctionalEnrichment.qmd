@@ -1,0 +1,159 @@
+---
+title: "Functional Enrichment"
+author: Jamie Soul
+format:
+  html:
+    self-contained: true
+    theme: litera
+    toc: true
+editor: visual
+code-block-bg: true
+code-block-border-left: "#31BAE9"
+---
+
+# Functional Enrichment Analysis
+
+## Load libraries
+
+```{r}
+#| output: false
+library(org.Hs.eg.db)
+library(reactome.db)
+library(clusterProfiler)
+library(ggridges)
+library(org.Hs.eg.db)
+library(rrvgo)
+library(tidyverse)
+library(writexl)
+library(cowplot)
+
+source("src/utilityFunctionsExtended.R")
+```
+
+## Load the differential expression data
+
+```{r}
+betweenDiseases <- readRDS("results/diffExpLME4_Q3.RDS")
+betweenCellTypes <- readRDS("results/diffExpLME4_Q3_betweenCellTypes.RDS")
+```
+
+## Between cell types
+
+```{r}
+egs <- bitr(unique(betweenCellTypes$Gene), "SYMBOL", "ENTREZID", OrgDb = org.Hs.eg.db)
+ranked <- merge(betweenCellTypes,egs,by.x="Gene",by.y="SYMBOL")
+
+GeneOntologyGSEA <- compareCluster(ranked,geneClusters = ENTREZID | Estimate ~ Contrast,fun="gseGO",
+                        OrgDb        = org.Hs.eg.db,
+                        ont          = "BP",
+                        minGSSize    = 10,
+                        maxGSSize    = 500,
+                        pvalueCutoff = 0.05,
+                        eps=0)
+  
+results <- as.data.frame(GeneOntologyGSEA)
+results$genes <- sapply(results$core_enrichment,getGeneSymbol)
+#write the gene ontology results to excel file
+write_xlsx(results,path = "results/cellTypeGeneOntology.xlsx" )
+
+
+  
+```
+
+## Between disease states
+
+### GSEA
+
+```{r}
+#| warning: false
+egs <- bitr(unique(betweenDiseases$Gene), "SYMBOL", "ENTREZID", OrgDb = org.Hs.eg.db)
+ranked <- merge(betweenDiseases,egs,by.x="Gene",by.y="SYMBOL")
+ranked$group <- word(ranked$Contrast,2,3)
+
+GeneOntologyGSEA <- compareCluster(ranked,geneClusters = ENTREZID | Estimate ~ group,fun="gseGO",
+                        OrgDb        = org.Hs.eg.db,
+                        ont          = "BP",
+                        minGSSize    = 10,
+                        maxGSSize    = 500,
+                        pvalueCutoff = 0.05,
+                        eps=0)
+  
+results <- as.data.frame(GeneOntologyGSEA)
+results$genes <- sapply(results$core_enrichment,getGeneSymbol)
+#write the gene ontology results to excel file
+write_xlsx(results,path = "results/diseaseGeneOntology.xlsx" )
+
+goplot <- dotplot(GeneOntologyGSEA,by="count",showCategory=c("response to estradiol","Wnt signaling pathway","DNA double-strand break processing","cell morphogenesis involved in differentiation","ovulation cycle","chordate embryonic development","sensory perception of smell","sperm-egg recognition","morphogenesis of a branching epithelium"), color="enrichmentScore") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + scale_fill_gradient2(low = "blue",mid = "white",high="red",name="Score") +  theme_cowplot(font_size = 20) + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + xlab("Comparison")  + ggtitle("GO Enrichment")
+
+save_plot("figures/pathways/betweenDisease_GO.png",goplot,base_height = 5,base_width = 5,bg="white")
+goplot
+
+
+goPlots <-  results %>% named_group_split(group) %>%  map(as.data.frame) %>% map(simplifyGeneOntology,threshold=0.90) %>% map( ~improvedScatterPlot(.[[2]],.[[1]]))
+
+g <- plot_grid(plotlist = goPlots,ncol = 1)
+
+save_plot("figures/pathways/betweenDisease_GO_MDS.png",g,base_height = 30,base_width = 8,bg="white")
+
+save_plot("figures/pathways/LuminalStroma_RIFvsCtrl_GO_MDS.png",goPlots$`Luminal Stroma`,base_height = 6,base_width =8,bg="white")
+goPlots$`Luminal Stroma`
+
+```
+
+### Kegg pathways
+
+```{r}
+
+
+
+keggGSEA <- compareCluster(data=ranked,geneClusters = ENTREZID | Estimate ~ group,fun="gseKEGG",
+minGSSize    = 10,
+maxGSSize    = 500,
+pvalueCutoff = 0.05,
+eps=0)
+
+keggResults <- as.data.frame(keggGSEA)
+keggResults$genes <- sapply(keggResults$core_enrichment,getGeneSymbol)
+#write the gene ontology results to excel file
+write_xlsx(keggResults,path = "results/diseasePathways.xlsx" )
+
+keggPlot <- dotplot(keggGSEA,by="Count",showCategory=c("Estrogen signaling pathway","Natural killer cell mediated cytotoxicity","Cytokine-cytokine receptor interaction","Th17 cell differentiation","Oxidative phosphorylation","Apoptosis","Protein processing in endoplasmic reticulum","Olfactory transduction"),color="enrichmentScore")  + scale_fill_gradient2(low = "blue",mid = "white",high="red",name="Score") +  theme_cowplot(font_size = 20) + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + xlab("Comparison")  + ggtitle("KEGG Enrichment")
+
+save_plot("figures/pathways/betweenDisease_KEGG.png",keggPlot,base_height = 5,base_width = 5,bg="white")
+
+#save plots
+saveRDS(list(goplot=goplot,kegg=keggPlot),"results/enrichmentPlots.RDS")
+
+keggPlot
+```
+
+### Enrichment
+
+```{r}
+#| eval: false
+#| echo: true
+
+#helper function to get the top n (up and down) genes
+getTopGenes <- function(x){
+  topGenes <- x[ x$FDR <= 0.1,"Gene"]
+  return(topGenes)
+}
+
+universe <- unique(betweenDiseases$Gene)
+
+#using the differentially expressed genes find enriched pathways
+pathways <- betweenDiseases %>%  named_group_split(Contrast) %>% map(as.data.frame) %>% 
+  map(~enricher(getTopGenes(.x),universe=universe,TERM2GENE = reactomePathwayData$TERM2GENE,
+            TERM2NAME =reactomePathwayData$TERM2NAME))
+
+
+pathways <- betweenDiseases %>%  named_group_split(Contrast) %>% map(as.data.frame) %>% map(~as.data.frame(enrichGO(gene = getTopGenes(.x),
+              OrgDb        = org.Hs.eg.db,
+              keyType =  "SYMBOL",
+              ont          = "BP",
+              minGSSize    = 10,
+              maxGSSize    = 500,
+              pvalueCutoff = 0.05,universe = universe )))
+```

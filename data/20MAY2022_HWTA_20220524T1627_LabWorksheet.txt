@@ -1,0 +1,111 @@
+Experiment Summary
+Readout group name	20MAY2022_HWTA
+Date	24 May 2022  4:27 PM
+Readout mode	NGS
+Number of Collection Plates	1
+Number Of AOIs	95
+Library Prep Protocol Version
+
+Library Prep Summary
+Library Prep Plate	Collection Plate	Primer Plate	Rows
+20MAY2022_HWTA-E	"=""1005990008601"""	GeoMx Seq Code E	A - H
+Total Area	7005356
+
+Annotations
+Sample_ID	slide name	scan name	panel	roi	segment	aoi	area	tags
+DSP-1005990008601-E-A01	No Template Control
+DSP-1005990008601-E-A02	Slide_1	Slide_1	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""001"""	PanCK	PanCK-aoi-001	23091.81
+DSP-1005990008601-E-A03	Slide_1	Slide_1	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""001"""	CD45	CD45-aoi-001	4101.85
+DSP-1005990008601-E-A04	Slide_1	Slide_1	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""001"""	Stroma	Stroma-aoi-001	71522.37
+DSP-1005990008601-E-A05	Slide_1	Slide_1	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""002"""	PanCK	PanCK-aoi-001	41208.86
+DSP-1005990008601-E-A06	Slide_1	Slide_1	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""002"""	CD45	CD45-aoi-001	4801.84
+DSP-1005990008601-E-A07	Slide_1	Slide_1	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""002"""	Stroma	Stroma-aoi-001	91153.21
+DSP-1005990008601-E-A08	Slide_1	Slide_1	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""003"""	PanCK	PanCK-aoi-001	141431.29
+DSP-1005990008601-E-A09	Slide_1	Slide_1	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""003"""	CD56	CD56-aoi-001	2487.61
+DSP-1005990008601-E-A10	Slide_1	Slide_1	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""003"""	Stroma	Stroma-aoi-001	250459.00
+DSP-1005990008601-E-A11	Slide_1	Slide_1	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""004"""	PanCK	PanCK-aoi-001	197553.25
+DSP-1005990008601-E-A12	Slide_1	Slide_1	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""004"""	CD56	CD56-aoi-001	6898.67
+DSP-1005990008601-E-B01	Slide_1	Slide_1	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""004"""	Stroma	Stroma-aoi-001	156706.41
+DSP-1005990008601-E-B02	Slide_1	Slide_1	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""005"""	PanCK	PanCK-aoi-001	27847.90
+DSP-1005990008601-E-B03	Slide_1	Slide_1	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""005"""	CD45	CD45-aoi-001	1313.68
+DSP-1005990008601-E-B04	Slide_1	Slide_1	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""005"""	Stroma	Stroma-aoi-001	65958.45
+DSP-1005990008601-E-B05	Slide_1	Slide_1	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""006"""	PanCK	PanCK-aoi-001	95894.69
+DSP-1005990008601-E-B06	Slide_1	Slide_1	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""006"""	CD56	CD56-aoi-001	4644.33
+DSP-1005990008601-E-B07	Slide_1	Slide_1	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""006"""	Stroma	Stroma-aoi-001	136346.50
+DSP-1005990008601-E-B08	Slide_1	Slide_1	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""007"""	PanCK	PanCK-aoi-001	21903.57
+DSP-1005990008601-E-B09	Slide_1	Slide_1	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""007"""	CD45	CD45-aoi-001	13307.98
+DSP-1005990008601-E-B10	Slide_1	Slide_1	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""007"""	Stroma	Stroma-aoi-001	72467.74
+DSP-1005990008601-E-B11	Slide_1	Slide_1	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""008"""	PanCK	PanCK-aoi-001	44058.49
+DSP-1005990008601-E-B12	Slide_1	Slide_1	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""008"""	CD56	CD56-aoi-001	8760.96
+DSP-1005990008601-E-C01	Slide_1	Slide_1	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""008"""	Stroma	Stroma-aoi-001	41692.55
+DSP-1005990008601-E-C02	Slide_2	Slide_2	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""001"""	PanCK	PanCK-aoi-001	20618.34
+DSP-1005990008601-E-C03	Slide_2	Slide_2	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""001"""	Stroma	Stroma-aoi-001	56844.27
+DSP-1005990008601-E-C04	Slide_2	Slide_2	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""002"""	PanCK	PanCK-aoi-001	182628.83
+DSP-1005990008601-E-C05	Slide_2	Slide_2	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""002"""	CD56	CD56-aoi-001	11251.56
+DSP-1005990008601-E-C06	Slide_2	Slide_2	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""002"""	Stroma	Stroma-aoi-001	140920.72
+DSP-1005990008601-E-C07	Slide_2	Slide_2	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""003"""	PanCK	PanCK-aoi-001	22613.15
+DSP-1005990008601-E-C08	Slide_2	Slide_2	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""003"""	CD45	CD45-aoi-001	10338.57
+DSP-1005990008601-E-C09	Slide_2	Slide_2	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""003"""	Stroma	Stroma-aoi-001	97108.86
+DSP-1005990008601-E-C10	Slide_2	Slide_2	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""004"""	PanCK	PanCK-aoi-001	106485.55
+DSP-1005990008601-E-C11	Slide_2	Slide_2	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""004"""	CD56	CD56-aoi-001	16514.92
+DSP-1005990008601-E-C12	Slide_2	Slide_2	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""004"""	Stroma	Stroma-aoi-001	155347.77
+DSP-1005990008601-E-D01	Slide_2	Slide_2	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""005"""	PanCK	PanCK-aoi-001	19123.42
+DSP-1005990008601-E-D02	Slide_2	Slide_2	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""005"""	CD45	CD45-aoi-001	3263.21
+DSP-1005990008601-E-D03	Slide_2	Slide_2	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""005"""	Stroma	Stroma-aoi-001	80046.59
+DSP-1005990008601-E-D04	Slide_2	Slide_2	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""006"""	PanCK	PanCK-aoi-001	102673.88
+DSP-1005990008601-E-D05	Slide_2	Slide_2	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""006"""	CD56	CD56-aoi-001	1726.00
+DSP-1005990008601-E-D06	Slide_2	Slide_2	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""006"""	Stroma	Stroma-aoi-001	269759.42
+DSP-1005990008601-E-D07	Slide_2	Slide_2	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""007"""	PanCK	PanCK-aoi-001	21141.49
+DSP-1005990008601-E-D08	Slide_2	Slide_2	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""007"""	CD45	CD45-aoi-001	20693.80
+DSP-1005990008601-E-D09	Slide_2	Slide_2	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""007"""	Stroma	Stroma-aoi-001	36502.60
+DSP-1005990008601-E-D10	Slide_2	Slide_2	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""008"""	PanCK	PanCK-aoi-001	136870.27
+DSP-1005990008601-E-D11	Slide_2	Slide_2	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""008"""	CD56	CD56-aoi-001	13819.34
+DSP-1005990008601-E-D12	Slide_2	Slide_2	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""008"""	Stroma	Stroma-aoi-001	149837.93
+DSP-1005990008601-E-E01	Slide_3	Slide_3	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""001"""	PanCK	PanCK-aoi-001	24975.63
+DSP-1005990008601-E-E02	Slide_3	Slide_3	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""001"""	CD45	CD45-aoi-001	4270.83
+DSP-1005990008601-E-E03	Slide_3	Slide_3	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""001"""	Stroma	Stroma-aoi-001	32184.45
+DSP-1005990008601-E-E04	Slide_3	Slide_3	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""002"""	PanCK	PanCK-aoi-001	89230.09
+DSP-1005990008601-E-E05	Slide_3	Slide_3	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""002"""	CD56	CD56-aoi-001	7763.24
+DSP-1005990008601-E-E06	Slide_3	Slide_3	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""002"""	Stroma	Stroma-aoi-001	330250.15
+DSP-1005990008601-E-E07	Slide_3	Slide_3	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""003"""	PanCK	PanCK-aoi-001	23478.04
+DSP-1005990008601-E-E08	Slide_3	Slide_3	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""003"""	CD45	CD45-aoi-001	2089.59
+DSP-1005990008601-E-E09	Slide_3	Slide_3	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""003"""	Stroma	Stroma-aoi-001	67964.57
+DSP-1005990008601-E-E10	Slide_3	Slide_3	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""004"""	PanCK	PanCK-aoi-001	96801.07
+DSP-1005990008601-E-E11	Slide_3	Slide_3	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""004"""	CD56	CD56-aoi-001	3416.79
+DSP-1005990008601-E-E12	Slide_3	Slide_3	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""004"""	Stroma	Stroma-aoi-001	257617.19
+DSP-1005990008601-E-F01	Slide_3	Slide_3	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""005"""	PanCK	PanCK-aoi-001	28915.26
+DSP-1005990008601-E-F02	Slide_3	Slide_3	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""005"""	CD45	CD45-aoi-001	528.49
+DSP-1005990008601-E-F03	Slide_3	Slide_3	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""005"""	Stroma	Stroma-aoi-001	91086.72
+DSP-1005990008601-E-F04	Slide_3	Slide_3	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""006"""	PanCK	PanCK-aoi-001	76089.20
+DSP-1005990008601-E-F05	Slide_3	Slide_3	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""006"""	CD56	CD56-aoi-001	1649.13
+DSP-1005990008601-E-F06	Slide_3	Slide_3	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""006"""	Stroma	Stroma-aoi-001	250099.65
+DSP-1005990008601-E-F07	Slide_3	Slide_3	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""007"""	PanCK	PanCK-aoi-001	32526.82
+DSP-1005990008601-E-F08	Slide_3	Slide_3	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""007"""	CD45	CD45-aoi-001	376.64
+DSP-1005990008601-E-F09	Slide_3	Slide_3	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""007"""	Stroma	Stroma-aoi-001	110473.91
+DSP-1005990008601-E-F10	Slide_3	Slide_3	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""008"""	PanCK	PanCK-aoi-001	98818.67
+DSP-1005990008601-E-F11	Slide_3	Slide_3	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""008"""	CD56	CD56-aoi-001	3746.59
+DSP-1005990008601-E-F12	Slide_3	Slide_3	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""008"""	Stroma	Stroma-aoi-001	352903.85
+DSP-1005990008601-E-G01	Slide_4	Slide_4	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""001"""	PanCK	PanCK-aoi-001	23409.81
+DSP-1005990008601-E-G02	Slide_4	Slide_4	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""001"""	Cd45	Cd45-aoi-001	724.36
+DSP-1005990008601-E-G03	Slide_4	Slide_4	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""001"""	Stroma	Stroma-aoi-001	104173.84
+DSP-1005990008601-E-G04	Slide_4	Slide_4	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""002"""	PanCK	PanCK-aoi-001	146681.13
+DSP-1005990008601-E-G05	Slide_4	Slide_4	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""002"""	CD56	CD56-aoi-001	6071.82
+DSP-1005990008601-E-G06	Slide_4	Slide_4	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""002"""	Stroma	Stroma-aoi-001	189416.83
+DSP-1005990008601-E-G07	Slide_4	Slide_4	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""003"""	PanCK	PanCK-aoi-001	27110.66
+DSP-1005990008601-E-G08	Slide_4	Slide_4	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""003"""	Cd45	Cd45-aoi-001	497.37
+DSP-1005990008601-E-G09	Slide_4	Slide_4	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""003"""	Stroma	Stroma-aoi-001	51748.16
+DSP-1005990008601-E-G10	Slide_4	Slide_4	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""004"""	PanCK	PanCK-aoi-001	156513.37
+DSP-1005990008601-E-G11	Slide_4	Slide_4	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""004"""	CD56	CD56-aoi-001	8713.80
+DSP-1005990008601-E-G12	Slide_4	Slide_4	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""004"""	Stroma	Stroma-aoi-001	214807.77
+DSP-1005990008601-E-H01	Slide_4	Slide_4	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""005"""	PanCK	PanCK-aoi-001	20088.91
+DSP-1005990008601-E-H02	Slide_4	Slide_4	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""005"""	Cd45	Cd45-aoi-001	1139.04
+DSP-1005990008601-E-H03	Slide_4	Slide_4	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""005"""	Stroma	Stroma-aoi-001	49962.74
+DSP-1005990008601-E-H04	Slide_4	Slide_4	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""006"""	PanCK	PanCK-aoi-001	174991.35
+DSP-1005990008601-E-H05	Slide_4	Slide_4	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""006"""	CD56	CD56-aoi-001	4119.14
+DSP-1005990008601-E-H06	Slide_4	Slide_4	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""006"""	Stroma	Stroma-aoi-001	229023.40
+DSP-1005990008601-E-H07	Slide_4	Slide_4	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""007"""	PanCK	PanCK-aoi-001	17700.80
+DSP-1005990008601-E-H08	Slide_4	Slide_4	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""007"""	Cd45	Cd45-aoi-001	16648.85
+DSP-1005990008601-E-H09	Slide_4	Slide_4	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""007"""	Stroma	Stroma-aoi-001	46025.32
+DSP-1005990008601-E-H10	Slide_4	Slide_4	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""008"""	PanCK	PanCK-aoi-001	90049.23
+DSP-1005990008601-E-H11	Slide_4	Slide_4	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""008"""	CD56	CD56-aoi-001	25204.51
+DSP-1005990008601-E-H12	Slide_4	Slide_4	(v1.0) Human NGS Whole Transcriptome Atlas RNA	"=""008"""	Stroma	Stroma-aoi-001	211533.71

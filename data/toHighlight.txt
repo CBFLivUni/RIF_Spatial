@@ -1,0 +1,33 @@
+Comparison	Gene
+Glandular CD56	TYROBP
+Glandular CD56	ANXA7
+Glandular CD56	PTBP1
+Glandular CD56	ADAM15
+Glandular CD56	ULBP1
+Glandular CD56	CD27
+Glandular CD56	IL24
+Luminal CD45	ULBP1
+Luminal CD45	APH1A
+Luminal CD45	PGRMC2
+Luminal CD45	HSD3B2
+Luminal CD45	ULBP1
+Luminal CD45	PTBP1
+Luminal Stroma	ULBP1
+Luminal Stroma	PGRMC2
+Luminal Stroma	TM4SF4
+Luminal Stroma	WNT4
+Glandular PanCK	ULBP1
+Glandular PanCK	ADAM15
+Glandular PanCK	CCDC13
+Glandular PanCK	PTBP1
+Glandular Stroma	ULBP1
+Glandular Stroma	ADAM15
+Glandular Stroma	PGRMC2
+Glandular Stroma	PTBP1
+Glandular Stroma	IL24
+Lumina PanCK	ULBP1
+Lumina PanCK	XRCC2
+Lumina PanCK	JUN
+Lumina PanCK	JUND
+Lumina PanCK	FOS
+

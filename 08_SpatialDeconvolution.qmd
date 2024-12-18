@@ -1,0 +1,415 @@
+---
+title: "Spatial decon"
+author:
+  - Jamie Soul
+format:
+  html:
+    self-contained: true
+    theme: litera
+    toc: true
+editor: visual
+code-block-bg: true
+code-block-border-left: "#31BAE9"
+---
+
+# Spatial Deconvolution
+
+## Load libraries
+
+```{r}
+#| output: false
+library(NanoStringNCTools)
+library(GeomxTools)
+library(GeoMxWorkflows)
+library(tidyverse)
+library(SpatialDecon)
+library(Seurat)
+library(SeuratDisk)
+library(ComplexHeatmap)
+library(SingleR)
+library(celldex)
+library(cowplot)
+library(ggsci)
+library(RColorBrewer)
+
+source("src/utilityFunctionsExtended.R")
+
+set.seed(123)
+```
+
+Note this notebook requires \~30Gb RAM to run as it processes very large single cell sequencing count matrices. The data is generally stored as spare matrices but the SpatialDecon library requires the use of dense matrices which is memory intensive.
+
+## Prepare Atlas single-cell data
+
+The reproductive cell atlas includes a endometrial dataset with broad and fine annotations. The immune cell sub annotations shown in a figure in the corresponding paper are not available and difficult to reproduce. Instead, we use singleR to automatically annotate the endometrial immune clusters so we can then use the labelled data to deconvolute the CD45/C56 samples.
+
+```{r}
+#| eval: false
+#| echo: true
+#make sure we don't timeout during the file download as this is a large file
+options(timeout = 100000000)
+download.file("https://cellgeni.cog.sanger.ac.uk/vento/reproductivecellatlas/endometrium_all.h5ad","data/endometrium_all.h5ad")
+Convert("data/endometrium_all.h5ad", dest = "h5seurat", overwrite = TRUE)
+
+```
+
+## Annotate immune cells
+
+```{r}
+#| eval: false
+#load the seurat data
+endometrium <- LoadH5Seurat("data/endometrium_all.h5seurat")
+
+#select just the immune cells
+immune <- endometrium[,endometrium$Broad.cell.type=="Immune"]
+
+#process the data to find clusters and visualise in low dim space
+immune <- FindVariableFeatures(immune, selection.method = "vst", nfeatures = 5000)
+all.genes <- rownames(immune)
+immune <- ScaleData(immune, features = all.genes)
+immune <- RunPCA(immune, features = VariableFeatures(object = immune))
+immune <- FindNeighbors(immune, dims = 1:20)
+immune <- FindClusters(immune, resolution = 0.1)
+immune <- RunUMAP(immune, dims = 1:20)
+immune <- RunTSNE(immune)
+#The MonacoImmuneData seems to have the best granularity of the annotations for this project
+ref <- MonacoImmuneData()
+
+#use the loaded reference data to annotate the immune data
+pred <- SingleR(test = as.SingleCellExperiment(immune), ref = ref, assay.type.test=1,
+                     labels = ref$label.main)
+
+#how many of each cell type are labelled?
+predictionTable <- data.frame(table(pred$labels))
+colnames(predictionTable) <- c("CellType","Number")
+
+#add the labels to to the 
+immune[["SingleR.labels"]] <- pred$labels
+#visualise the data by predicted cell type label
+g1 <-  TSNEPlot(immune)
+g2 <- TSNEPlot(immune,group.by = "SingleR.labels")
+
+g <- plot_grid(plotlist = list(g1,g2),ncol = 2)
+
+cowplot::save_plot("figures/Deconv/immuneAnnotations.png",g,base_width = 9,base_height = 7,bg="white")
+
+g
+
+```
+
+## Load the normalised data
+
+```{r}
+target_spatialData <- readRDS("results/normalisedSpatialData.RDS")
+```
+
+## Calculate background scores
+
+```{r}
+bg <- derive_GeoMx_background(norm = target_spatialData@assayData$q_norm,
+                             probepool = fData(target_spatialData)$Module,
+                             negnames = "NegProbe-WTX")
+
+
+```
+
+## Set up immune cell profile
+
+```{r}
+#| eval: false
+
+genes <- rownames(immune@assays$RNA)
+immune <- immune[ genes %in% rownames(target_spatialData),]
+
+#get the cell type annotations
+immuneLabels <- data.frame(CellID=names(immune$SingleR.labels),LabeledCellType=as.character(immune$SingleR.labels))
+
+immuneClusterLabels <- data.frame(CellID=names(immune$seurat_clusters),LabeledCellType=as.character(immune$seurat_clusters))
+
+#function to create a dense matrix from a sparse matrix in a memory efficient way
+as_matrix <- function(mat){
+
+  tmp <- matrix(data=0L, nrow = mat@Dim[1], ncol = mat@Dim[2])
+  
+  row_pos <- mat@i+1
+  col_pos <- findInterval(seq(mat@x)-1,mat@p[-1])+1
+  val <- mat@x
+    
+  for (i in seq_along(val)){
+      tmp[row_pos[i],col_pos[i]] <- val[i]
+  }
+    
+  row.names(tmp) <- mat@Dimnames[[1]]
+  colnames(tmp) <- mat@Dimnames[[2]]
+  return(tmp)
+}
+
+#create a dense matrix from the sparse matrix
+immune <- as_matrix(immune@assays$RNA@counts)
+
+custom_mtx <- create_profile_matrix(
+  mtx = immune,
+  cellAnnots = immuneLabels,
+  cellTypeCol = "LabeledCellType",
+  cellNameCol = "CellID",
+  matrixName = "endometrium",
+  outDir = NULL,
+  normalize = FALSE,
+  minCellNum = 5,
+  minGenes = 10,
+  scalingFactor = 5,
+  discardCellTypes = TRUE
+)         
+
+saveRDS(custom_mtx,file="data/endometrium_immune_auto.RDS")
+
+
+custom_mtx <- create_profile_matrix(
+  mtx = immune,
+  cellAnnots = immuneClusterLabels,
+  cellTypeCol = "LabeledCellType",
+  cellNameCol = "CellID",
+  matrixName = "endometrium",
+  outDir = NULL,
+  normalize = FALSE,
+  minCellNum = 5,
+  minGenes = 10,
+  scalingFactor = 5,
+  discardCellTypes = TRUE
+)         
+
+saveRDS(custom_mtx,file="data/endometrium_immune_clusers.RDS")
+```
+
+## Set up broad and fine cell profiles
+
+```{r}
+#| eval: false
+#| echo: true
+genes <- rownames(endometrium@assays$RNA)
+endometrium <- endometrium[ genes %in% rownames(target_spatialData),]
+
+#get the cell type annotations
+cellTypes.fine <- data.frame(CellID=names(endometrium$Cell.type),LabeledCellType=as.character(endometrium$Cell.type))
+cellTypes.broad <- data.frame(CellID=names(endometrium$Broad.cell.type),LabeledCellType=as.character(endometrium$Broad.cell.type))
+
+#create a dense matrix from the sparse matrix
+endometrium <- as_matrix(endometrium@assays$RNA@counts)
+
+
+#create the profile matrix
+custom_mtx <-
+  create_profile_matrix(
+    mtx = endometrium,
+    # cell x gene count matrix
+    cellAnnots = cellTypes.fine,
+    # cell annotations with cell type and cell name as columns
+    cellTypeCol = "LabeledCellType",
+    # column containing cell type
+    cellNameCol = "CellID",
+    # column containing cell ID/name
+    matrixName = "endometrium",
+    # name of final profile matrix
+    outDir = NULL,
+    # path to desired output directory, set to NULL if matrix should not be written
+    normalize = FALSE,
+    # Should data be normalized?
+    minCellNum = 5,
+    # minimum number of cells of one type needed to create profile, exclusive
+    minGenes = 10,
+    # minimum number of genes expressed in a cell, exclusive
+    scalingFactor = 5,
+    # what should all values be multiplied by for final matrix
+    discardCellTypes = TRUE
+  )
+
+saveRDS(custom_mtx, file = "data/endometrium_atlas_fine.RDS")
+
+custom_mtx <-
+  create_profile_matrix(
+    mtx = endometrium,
+    # cell x gene count matrix
+    cellAnnots = cellTypes.broad,
+    # cell annotations with cell type and cell name as columns
+    cellTypeCol = "LabeledCellType",
+    # column containing cell type
+    cellNameCol = "CellID",
+    # column containing cell ID/name
+    matrixName = "endometrium",
+    # name of final profile matrix
+    outDir = NULL,
+    # path to desired output directory, set to NULL if matrix should not be written
+    normalize = FALSE,
+    # Should data be normalized?
+    minCellNum = 5,
+    # minimum number of cells of one type needed to create profile, exclusive
+    minGenes = 10,
+    # minimum number of genes expressed in a cell, exclusive
+    scalingFactor = 5,
+    # what should all values be multiplied by for final matrix
+    discardCellTypes = TRUE
+  )
+
+saveRDS(custom_mtx,file="data/endometrium_atlas_broad.RDS")
+```
+
+## Deconvolute using broad annotations
+
+The broad annotations show good correspondence to the known regions
+
+```{r}
+custom_mtx <- readRDS(file="data/endometrium_atlas_broad.RDS")
+res <- runspatialdecon(object = target_spatialData,
+                      norm_elt = "q_norm",
+                      raw_elt = "exprs",
+                      X = custom_mtx,
+                      align_genes = TRUE)
+
+dat <- t(res$beta)
+colnames(dat) <- pData(target_spatialData)$Region
+
+dat <- dat[ rowSums(dat)>0,]
+
+pData(target_spatialData)$Tissue <- word(pData(target_spatialData)$Region,2)
+
+columns <- c("Segment tags", "Disease","Tissue")
+annotationColours <- mapply(function(column,colourSet) makeColours(pData(target_spatialData)[, column],colourSet),columns,c("nrc","Set2","Set3"),SIMPLIFY = FALSE)
+names(annotationColours) <- columns
+
+column_ha = HeatmapAnnotation( df = pData(target_spatialData)[, c("Segment tags", "Disease","Tissue")],col=annotationColours,show_legend = FALSE,annotation_name_gp= gpar(fontsize = 18))
+
+col_fun = circlize::colorRamp2(c(-1, 0, 200), c("green", "white", "red"))
+p <- Heatmap(dat, name="beta" ,show_column_names = FALSE, top_annotation=column_ha,col = col_fun, row_names_gp = grid::gpar(fontsize = 18))
+
+saveRDS(p,"results/Fig2C_spatialDeconBroadHeatmap.RDS")
+
+png("figures/Deconv/EndothelialCellTypeHeatmap_broad.png",width = 5,height=7,res=600,units="in")
+p
+dev.off()
+p
+
+
+```
+
+## Deconvolute using fine annotations
+
+Fine annotation seem less useful and split arbitrarily across the similar samples rather than been a mixture of cell types.
+
+```{r}
+custom_mtx <- readRDS(file="data/endometrium_atlas_fine.RDS")
+res <- runspatialdecon(object = target_spatialData,
+                      norm_elt = "q_norm",
+                      raw_elt = "exprs",
+                      X = custom_mtx,
+                      align_genes = TRUE)
+
+dat <- t(res$beta)
+#dat <- t(res$prop_of_nontumor)
+colnames(dat) <- pData(target_spatialData)$Region
+
+dat <- dat[ rowSums(dat)>0,]
+
+pData(target_spatialData)$Tissue <- word(pData(target_spatialData)$Region,2)
+column_ha = HeatmapAnnotation( df = pData(target_spatialData)[, c("Segment tags", "Disease","Tissue","slide name","PatientID")])
+
+col_fun = circlize::colorRamp2(c(-1, 0, 200), c("green", "white", "red"))
+p <- Heatmap(dat, name="beta" ,show_column_names = FALSE, top_annotation=column_ha,col = col_fun)
+
+png("figures/Deconv/EndothelialCellTypeHeatmap_fine.png",width = 5,height=7,res=600,units="in")
+p
+dev.off()
+p
+
+dat <- t(res$prop_of_nontumor)
+colnames(dat) <- pData(target_spatialData)$Region
+dat <- dat[ rowSums(dat)>0,]
+
+col_fun = circlize::colorRamp2(c(0, 0, 1), c("white", "white", "red"))
+p <- Heatmap(dat, name="prop" ,show_column_names = FALSE, top_annotation=column_ha,col = col_fun)
+
+png("figures/Deconv/EndothelialCellTypeHeatmap_fineProp.png",width = 5,height=7,res=600,units="in")
+p
+dev.off()
+p
+```
+
+## Deconvolute using immune annotations
+
+More NK cells annotated to the CD56 samples than the CD45 as expected, no clear evidence of differences in number of estimated immune cell types between RIF and control.
+
+### Heatmaps
+
+```{r}
+custom_mtx <- readRDS(file="data/endometrium_immune_auto.RDS")
+
+target_spatialData_immune <- target_spatialData[ , pData(target_spatialData)$segment %in% c("CD45","CD56")]
+
+res <- runspatialdecon(object = target_spatialData_immune,
+                      norm_elt = "q_norm",
+                      raw_elt = "exprs",
+                      X = custom_mtx,
+                      align_genes = TRUE)
+
+dat <- t(res$beta)
+#dat <- t(res$prop_of_nontumor)
+colnames(dat) <- pData(target_spatialData_immune)$Region
+
+dat <- dat[ rowSums(dat)>0,]
+
+pData(target_spatialData_immune)$Tissue <- word(pData(target_spatialData_immune)$Region,2)
+column_ha = HeatmapAnnotation( df = pData(target_spatialData_immune)[, c("Segment tags", "Disease","Tissue","slide name","PatientID")])
+
+col_fun = circlize::colorRamp2(c(-1, 0, 200), c("green", "white", "red"))
+p <- Heatmap(dat, name="beta" ,show_column_names = FALSE, top_annotation=column_ha,col = col_fun)
+
+png("figures/Deconv/EndothelialCellTypeHeatmap_immune.png",width = 5,height=7,res=600,units="in")
+p
+dev.off()
+p
+
+dat <- t(res$prop_of_nontumor)
+colnames(dat) <- pData(target_spatialData_immune)$Region
+dat <- dat[ rowSums(dat)>0,]
+
+col_fun = circlize::colorRamp2(c(0, 0, 1), c("white", "white", "red"))
+p <- Heatmap(dat, name="prop" ,show_column_names = FALSE, top_annotation=column_ha,col = col_fun)
+
+png("figures/Deconv/EndothelialCellTypeHeatmap_fineProp.png",width = 5,height=7,res=600,units="in")
+p
+dev.off()
+p
+```
+
+### Proportion barcharts
+
+```{r}
+
+#prepare the cell estimate data for plotting
+props <- t(res$prop_of_nontumor)
+props <- props[ rowSums(props)> 0,]
+colnames(props) <- make.names(pData(res)$Region,unique = TRUE)
+p <- Heatmap(dat, name="prop" ,show_column_names = FALSE, top_annotation=column_ha,col = col_fun)
+o = hclust(dist(t(props)))$order
+props <- props[,o]
+
+
+props <- reshape2::melt(props)
+colnames(props)[1] <- c("CellType")
+props$Label <- word(props$Var2,start = 1,end=3,sep="\\.")
+props <- props[ order(props$Label),]
+l <- sort(levels(factor(props$Var2)),decreasing = T)
+props$Label <- factor(props$Label,l)
+props$Tissue <- word(props$Var2,start = 2,end=3,sep="\\.")
+props$Disease <- word(props$Var2,start = 1,sep="\\.")
+
+
+#aggregate the estimates per tissue/disease type
+props <- props %>% group_by(Label,CellType,Tissue,Disease) %>% summarise(meanValue=mean(value))
+
+g <- ggplot(props, aes(fill=CellType, y=meanValue, x=Disease)) + 
+    geom_bar(position="stack", stat="identity") + cowplot::theme_cowplot()+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + facet_wrap(~Tissue) + ylab("Mean proportion")
+
+cowplot::save_plot("figures/Deconv/immunecellProp.png",g,base_height = 8,base_width = 17,bg="white")
+
+
+```

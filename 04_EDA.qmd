@@ -1,0 +1,385 @@
+---
+title: "Exploratory Data Analysis"
+author:
+  - Emily Johnson
+  - Jamie Soul
+format:
+  html:
+    self-contained: true
+    theme: litera
+    toc: true
+editor: visual
+code-block-bg: true
+code-block-border-left: "#31BAE9"
+---
+
+# Exploratory Data analysis
+
+## Load libraries
+
+```{r}
+#| output: false
+library(NanoStringNCTools)
+library(GeomxTools)
+library(GeoMxWorkflows)
+library(tidyverse)
+library(cowplot)
+library(factoextra)
+library(gplots)
+library(reshape2)
+library(Rtsne)
+library(clusterProfiler)
+library(writexl)
+library(org.Hs.eg.db)
+library(AnnotationDbi)
+library(ggsci)
+```
+
+## Load the normalised data
+
+The data from both the Q3 and GeoDiff normalisation approaches are used.
+
+```{r}
+target_spatialData <- readRDS("results/normalisedSpatialData.RDS")
+target_spatialData_GeoDiff <- readRDS("results/GeoDiffNormalisedSpatialData.RDS")
+```
+
+## Dimension reduction
+
+### PCA for Q3 normalisation
+
+PCA is used to understand the experimental and technical factors explaining the variance in the data.
+
+```{r}
+#| label: fig-PCA
+#| fig-cap: PCA of the spatial transciptomics data
+#| fig-width: 11
+#| fig-height: 9
+
+normalisedData <- log2(assayDataElement(target_spatialData , elt = "q_norm"))
+
+pca_res <- prcomp(t(normalisedData), scale = TRUE)
+df_out <- as.data.frame(pca_res$x)
+
+pheno <- pData(target_spatialData)
+pheno$Region <- word(pheno$Region,2)
+# normalise the data
+normalisedData <- log2(assayDataElement(target_spatialData , elt = "q_norm"))
+
+# perform PCA on the normalised data
+pca_res <- prcomp(t(normalisedData), scale = TRUE)
+
+# convert the PCA results to a data frame
+df_out <- as.data.frame(pca_res$x)
+
+# extract the phenotypic data from the spatial data
+pheno <- pData(target_spatialData)
+
+# extract the region from the phenotypic data
+pheno$Region <- word(pheno$Region,2)
+
+# add the phenotypic data to the PCA results
+df_out <- cbind(df_out,pheno)
+
+
+
+p1 <- ggplot(df_out, aes(x=PC1, y=PC2, colour = segment, shape=Disease)) + 
+    geom_point() + 
+    xlab(paste0('PC1: ', round(as.numeric(summary(pca_res)$importance[2,1]*100)), '% expl.var')) + 
+    ylab(paste0('PC2: ', round(as.numeric(summary(pca_res)$importance[2,2]*100)), '% expl.var')) + 
+    scale_color_npg(palette = "nrc") +
+    theme_cowplot() + 
+    labs(colour = "Staining", shape = "Condition")
+
+saveRDS(p1,file = "results/Fig2A_PCA.RDS")
+
+
+p2 <- ggplot(df_out, aes(x=PC1, y=PC2, colour = Disease)) +   geom_point() + 
+    xlab(paste0('PC1: ', round(as.numeric(summary(pca_res)$importance[2,1]*100)), '% expl.var')) + 
+    ylab(paste0('PC2: ', round(as.numeric(summary(pca_res)$importance[2,2]*100)), '% expl.var')) + 
+    scale_color_npg(palette = "nrc") +
+    theme_cowplot() + 
+    labs(colour = "Condition")
+
+
+p3 <- ggplot(df_out, aes(x=PC1, y=PC2, color = `slide name`,shape = Disease)) +   geom_point() + 
+    xlab(paste0('PC1: ', round(as.numeric(summary(pca_res)$importance[2,1]*100)), '% expl.var')) + 
+    ylab(paste0('PC2: ', round(as.numeric(summary(pca_res)$importance[2,2]*100)), '% expl.var')) + 
+    scale_color_npg(palette = "nrc") +
+    theme_cowplot() + 
+    labs(shape = "Condition",color = "slide name")
+
+
+p4 <- fviz_eig(pca_res) + theme_cowplot() + labs(title="",
+        x ="Principal components", y = "% Variance Explained")
+
+pcaPlot <- plot_grid(p1,p2,p3,p4,ncol = 2,labels = "AUTO")
+
+save_plot(filename = "figures/EDA/PCA.png",plot = pcaPlot,base_height = 8,base_width = 11, bg="white")
+
+
+pcaPlot
+
+#try extra PCs
+
+p1 <- ggplot(df_out, aes(x=PC1, y=PC3, colour = segment, shape=Disease)) + 
+    geom_point() + 
+    xlab(paste0('PC1: ', round(as.numeric(summary(pca_res)$importance[2,1]*100)), '% expl.var')) + 
+    ylab(paste0('PC3: ', round(as.numeric(summary(pca_res)$importance[2,2]*100)), '% expl.var')) + 
+    scale_color_npg(palette = "nrc") +
+    theme_cowplot() + 
+    labs(colour = "Staining", shape = "Condition")
+
+saveRDS(p1,file = "results/Fig2B_PCA.RDS")
+
+
+p2 <- ggplot(df_out, aes(x=PC1, y=PC3, colour = Disease)) +   geom_point() + 
+    xlab(paste0('PC1: ', round(as.numeric(summary(pca_res)$importance[2,1]*100)), '% expl.var')) + 
+    ylab(paste0('PC3: ', round(as.numeric(summary(pca_res)$importance[2,3]*100)), '% expl.var')) + 
+    scale_color_npg(palette = "nrc") +
+    theme_cowplot() + 
+    labs(colour = "Condition")
+```
+
+The same PCA plot is shown with different colour/shape labelling combinations.
+
+```{r}
+#| label: fig-heatmap_PCA
+#| fig-cap: heatmap of correlation of principal components and experiment covariants
+#| fig-width: 7
+#| fig-height: 7
+# Function to calculate correlation between covariates and PCs
+get_r2 <- function(x, y) {
+  stopifnot(length(x) == length(y))
+  model <- lm(y ~ x)
+  stats <- summary(model)
+  return(stats$adj.r.squared)
+}
+
+# Selection of covariates 
+covariates <- pheno[,c("slide name","segment","area","Disease","Region","PatientID","Age","BMI")]
+# Extract first 8 PCs
+pcs <- df_out[1:8]
+
+plotHeatmap <- function(pcs,covariates) {
+  
+  # Generate the data
+pc_correlation <- matrix(NA, nrow = ncol(covariates), ncol = ncol(pcs),
+             dimnames = list(colnames(covariates), colnames(pcs)))
+for (cov in colnames(covariates)) {
+  for (pc in colnames(pcs)) {
+    pc_correlation[cov, pc] <- get_r2(covariates[, cov], pcs[, pc])
+  }
+}
+
+# Plot
+heatmap <- heatmap.2(pc_correlation, 
+          cexRow=0.90, cexCol=1.2,
+          Rowv = T, Colv=F, 
+          trace="none",
+          dendrogram = "row",
+          scale="none",
+          col=bluered(100),
+          margins=c(4,8))
+  
+}
+png("figures/EDA/heatmap_pca_Q3.png",height=5,width=7,units = "in",res=600)
+plotHeatmap(pcs,covariates)
+dev.off()
+
+plotHeatmap(pcs,covariates)
+
+```
+
+The heatmap shows the correlation of the PCs with each known experimental variable.
+
+### Gene contribution to PCs
+
+Using the loadings (eigenvalues) we can see the contribution of each gene to each PC.
+
+```{r}
+#get the loadings i.e the eigenvalues and select the top 10 genes for PC1 and PC2
+loadings <- pca_res$rotation %>% melt %>% filter(Var2 %in% c("PC1","PC2"))
+colnames(loadings)[1:2] <- c("Gene","PC")
+
+topGenes <- loadings %>% group_by(PC) %>% slice_max(abs(value),n=10)
+knitr::kable(topGenes)
+
+```
+
+### GSEA and enrichment using the loadings
+
+Pathway enrichment analysis can be performed on the loadings for each PC.
+
+```{r}
+#| warning: false
+#| eval: false
+#| echo: true
+
+#get the symbol to entrez gene id map
+symbolToEntrez  <- AnnotationDbi::select(org.Hs.eg.db, keys=as.character(loadings$Gene), columns='ENTREZID', keytype='SYMBOL')
+
+#for each PC make a sorted vector with the genes as the names
+rankedGeneLists <- loadings %>% left_join(symbolToEntrez,c("Gene"="SYMBOL")) %>%
+  group_by(PC) %>%
+  group_split() %>%
+  map(~dplyr::select(.,ENTREZID,value)) %>% map(~sort(deframe(.),decreasing = TRUE))
+
+#run GSEA for each PC
+gseaResults <- rankedGeneLists %>%  map(~as.data.frame(gseKEGG(geneList =.x,
+               organism     = 'hsa',
+               keyType = "ncbi-geneid",
+               minGSSize    = 10,
+               pvalueCutoff = 0.05,
+               eps=0,
+               verbose = FALSE)))
+
+#helper function to get the top n (up and down) genes
+getTopGenes <- function(x,n=500){
+  start <- n-1
+  return(names(x)[c(1:n,(length(x)-start):length(x))])
+}
+
+#using the top 1000 genes find enriched pathways
+pathways <- rankedGeneLists %>% 
+  map(~enrichKEGG(getTopGenes(.x),keyType = "ncbi-geneid",universe=names(.x)))
+
+#quickly plot the overview of the pathways
+names(pathways) <- c("PC1","PC2")
+pathways %>% map(dotplot)
+
+```
+
+### PCA for GeoDiff Normalisation
+
+The PCA plot for the GeoDiff normalisation is overall similar in structure to the Q3 normalisation.
+
+```{r}
+#| label: fig-PCAGeoDiff
+#| fig-cap: PCA of the spatial transciptomics data
+#| fig-width: 11
+#| fig-height: 9
+
+ROIs_high <- sampleNames(target_spatialData_GeoDiff)[which((quantile(fData(target_spatialData_GeoDiff)[["para"]][, 1],
+                                                  probs = 0.90, na.rm = TRUE) -   notes(target_spatialData_GeoDiff)[["threshold"]])*target_spatialData_GeoDiff$sizefact_fitNBth>2)]
+
+normalisedData <- na.omit(assayDataElement(target_spatialData_GeoDiff , elt = "normmat"))
+
+pca_res <- prcomp(t(normalisedData), scale = TRUE)
+df_out <- as.data.frame(pca_res$x)
+
+pheno <- pData(target_spatialData_GeoDiff)
+
+
+
+p1 <- ggplot(df_out, aes(x=PC1, y=PC2, colour = pheno$segment, shape=pheno$Disease)) + 
+    geom_point() + 
+    xlab(paste0('PC1: ', round(as.numeric(summary(pca_res)$importance[2,1]*100)), '% expl.var')) + 
+    ylab(paste0('PC2: ', round(as.numeric(summary(pca_res)$importance[2,2]*100)), '% expl.var')) + 
+    scale_colour_brewer(palette = "Set1") +
+    theme_cowplot() + 
+    labs(colour = "Staining", shape = "Condition")
+
+p2 <- ggplot(df_out, aes(x=PC1, y=PC2, colour = pheno$Disease)) +   geom_point() + 
+    xlab(paste0('PC1: ', round(as.numeric(summary(pca_res)$importance[2,1]*100)), '% expl.var')) + 
+    ylab(paste0('PC2: ', round(as.numeric(summary(pca_res)$importance[2,2]*100)), '% expl.var')) + 
+    scale_colour_brewer(palette = "Set1") +
+    theme_cowplot() + 
+    labs(colour = "Condition")
+
+
+p3 <- ggplot(df_out, aes(x=PC1, y=PC2, color = pheno$`slide name`,shape = pheno$Disease)) +   geom_point() + 
+    xlab(paste0('PC1: ', round(as.numeric(summary(pca_res)$importance[2,1]*100)), '% expl.var')) + 
+    ylab(paste0('PC2: ', round(as.numeric(summary(pca_res)$importance[2,2]*100)), '% expl.var')) + 
+    scale_colour_brewer(palette = "Set1") +
+    theme_cowplot() + 
+    labs(shape = "Condition",color = "slide name")
+
+p4 <- fviz_eig(pca_res) + theme_cowplot() + labs(title="",
+        x ="Principal components", y = "% Variance Explained")
+
+pcaPlot <- plot_grid(p1,p2,p3,p4,ncol = 2,labels = "AUTO")
+
+save_plot(filename = "figures/EDA/PCAGeoDiff.png",plot = pcaPlot,base_height = 8,base_width = 11, bg="white")
+
+
+pcaPlot
+```
+
+```{r}
+#| label: fig-heatmap_PCAGeoDiff
+#| fig-cap: heatmap of correlation of principal components and experiment covariants
+#| fig-width: 7
+#| fig-height: 7
+# Function to calculate correlation between covariates and PCs
+
+# Selection of covariates 
+covariates <- pheno[,c("slide name","segment","area","Disease","Region","PatientID","Age","BMI")]
+
+# Extract first 8 PCs
+pcs <- df_out[1:8]
+
+
+png("figures/EDA/heatmap_pca_geodiff.png",height=5,width=7,units = "in",res=600)
+plotHeatmap(pcs,covariates)
+dev.off()
+
+plotHeatmap(pcs,covariates)
+
+
+
+```
+
+### t-SNE
+
+t-SNE is a non-linear alternative to PCA. Similar separation of samples by disease and cell types is seen.
+
+```{r}
+#| label: fig-TSNE
+#| fig-cap: t-sne plot of the spatial transciptomics data
+#| fig-width: 6
+#| fig-height: 12
+
+# set seed to 42
+set.seed(42)
+
+# run tSNE on the normalised data
+tSNEFit <- Rtsne(t(normalisedData), scale = TRUE,perplexity = 5)
+
+# create a dataframe of the tSNE data
+tSNEData <- tSNEFit$Y %>% 
+  as.data.frame() %>%
+  rename(tSNE1="V1",
+         tSNE2="V2") %>%
+  mutate(ID=row_number())
+
+
+t1 <- ggplot(tSNEData, aes(x=tSNE1, y=tSNE2, colour = pheno$segment, shape=pheno$Disease)) +     geom_point() + 
+  scale_colour_brewer(palette = "Set1") +
+    theme_cowplot() + 
+    labs(colour = "Staining", shape = "Condition")
+
+t2 <- ggplot(tSNEData, aes(x=tSNE1, y=tSNE2, colour = pheno$Disease)) +     geom_point() + 
+  scale_colour_brewer(palette = "Set1") +
+    theme_cowplot() + 
+    labs(colour = "Condition")
+
+t3 <- ggplot(tSNEData, aes(x=tSNE1, y=tSNE2, color = pheno$`slide name`,shape = pheno$Disease)) +     geom_point() + 
+  scale_colour_brewer(palette = "Set1") +
+    theme_cowplot() + 
+    labs(colour = "Slide", shape = "Condition")
+
+tsnePlot <- plot_grid(t1,t2,t3,ncol = 1,labels = "AUTO")
+
+save_plot(filename = "figures/EDA/tsne.png",plot = tsnePlot,base_height = 12,base_width = 6, bg="white")
+
+tsnePlot
+```
+
+::: {.callout-note collapse="true"}
+## Session Info
+
+```{r}
+sessionInfo()
+```
+:::

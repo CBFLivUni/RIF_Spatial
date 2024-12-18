@@ -1,0 +1,7 @@
+Factor	Numerator	Denominator
+Region	RIF.Glandular.CD56	Control.Glandular.CD56
+Region	RIF.Glandular.PanCK	Control.Glandular.PanCK
+Region	RIF.Glandular.Stroma	Control.Glandular.Stroma
+Region	RIF.Luminal.CD45	Control.Luminal.CD45
+Region	RIF.Luminal.PanCK	Control.Luminal.PanCK
+Region	RIF.Luminal.Stroma	Control.Luminal.Stroma

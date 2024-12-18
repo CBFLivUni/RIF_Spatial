@@ -1,0 +1,322 @@
+---
+title: "Differential Expression Analysis - Disease"
+author: Jamie Soul
+format:
+  html:
+    self-contained: true
+    theme: litera
+    toc: true
+editor: visual
+code-block-bg: true
+code-block-border-left: "#31BAE9"
+---
+
+# Differential expression analysis
+
+## Load libraries
+
+```{r}
+#| output: false
+library(NanoStringNCTools)
+library(GeomxTools)
+library(GeoMxWorkflows)
+library(tidyverse)
+library(cowplot)
+library(factoextra)
+library(gplots)
+library(reshape2)
+library(pheatmap)
+library(writexl)
+library(ggrepel)
+library(patchwork)
+library(edgeR)
+library(limma)
+library(statmod)
+library(BiocParallel)
+library(variancePartition)
+library(ggvenn)
+library(GeoDiff)
+library(UpSetR)
+library(performance)
+library(ComplexHeatmap)
+library(ggsci)
+library(RColorBrewer)
+
+source("src/utilityFunctionsExtended.R")
+```
+
+## Load the normalised data
+
+```{r}
+target_spatialData <- readRDS("results/normalisedSpatialData.RDS")
+target_spatialData_GeoDiff <- readRDS("results/GeoDiffNormalisedSpatialData.RDS")
+spatialDataGeoDiff <- readRDS("results/GeoDiffSpatialData.RDS")
+
+#set the cores to use
+cores <- 4
+```
+
+![Overview of modelling](img/model_overview.png)
+
+## Between slide analysis
+
+### Set up the data
+
+```{r}
+pData(target_spatialData)$testDisease <- 
+    factor(pData(target_spatialData)$Disease, c("RIF" ,"Control"))
+
+
+pData(target_spatialData)$segment <- paste(pData(target_spatialData)$segment,word(pData(target_spatialData)$Region,2),sep="_")
+
+pData(target_spatialData)[["slide"]] <- 
+    factor(pData(target_spatialData)[["slide name"]])
+
+pData(target_spatialData_GeoDiff)[["slide"]] <- 
+    factor(pData(target_spatialData_GeoDiff)[["slide name"]])
+
+pData(target_spatialData_GeoDiff)$testDisease <- 
+    factor(pData(target_spatialData_GeoDiff)$Disease, c("RIF" ,"Control"))
+
+pData(target_spatialData_GeoDiff)$segment <- paste(pData(target_spatialData_GeoDiff)$segment,word(pData(target_spatialData_GeoDiff)$Region,2),sep="_")
+
+assayDataElement(object = target_spatialData, elt = "log_q") <-
+    assayDataApply(target_spatialData, 2, FUN = log, base = 2, elt = "q_norm")
+
+ROIs_high <- sampleNames(target_spatialData_GeoDiff)[which((quantile(fData(target_spatialData_GeoDiff)[["para"]][, 1],
+                                                  probs = 0.90, na.rm = TRUE) -   notes(target_spatialData_GeoDiff)[["threshold"]])*target_spatialData_GeoDiff$sizefact_fitNBth>2)]
+
+target_spatialData_GeoDiff <- target_spatialData_GeoDiff[-which(fData(target_spatialData_GeoDiff)$CodeClass == "Negative"), ]
+
+target_spatialData_GeoDiff <- target_spatialData_GeoDiff[,ROIs_high]
+target_spatialData_GeoDiff <- target_spatialData_GeoDiff[fData(target_spatialData_GeoDiff)[["pvalues"]] < 1e-3,]
+
+
+pData(spatialDataGeoDiff)[["slide"]] <- 
+    factor(pData(spatialDataGeoDiff)[["slide name"]])
+```
+
+### using lme4
+
+```{r}
+
+#reorder the levels to make the contrasts more useful
+l <- sort(levels(factor(pData(target_spatialData)$Region)),decreasing = T)
+pData(target_spatialData)$Region <- factor(pData(target_spatialData)$Region,l)
+
+diffExpLME4_Q3 <- lme4DE(target_spatialData, cores = cores)
+saveRDS(diffExpLME4_Q3,file="results/diffExpLME4_Q3_all.RDS")
+
+
+contrasts <- read.delim("data/contrastGroups.txt")
+contrasts <- t(apply(contrasts,1,function(x) gsub("\\."," ",x)))
+contrasts <- apply(contrasts,1,function(x) paste0(x[2], " - ",x[3]))
+
+diffExpLME4_Q3 <- diffExpLME4_Q3[ diffExpLME4_Q3$Contrast %in% contrasts,]
+diffExpLME4_Q3$meanExp <- rowMeans(assayDataElement(target_spatialData, elt = "log_q"))
+diffExpLME4Tables_Q3 <- diffExpLME4_Q3 %>%  named_group_split(Contrast) %>% map(as.data.frame)
+saveRDS(diffExpLME4_Q3,file="results/diffExpLME4_Q3.RDS")
+
+write_xlsx(diffExpLME4Tables_Q3,path = "results/diffExpLME4_Q3.xlsx" )
+
+
+l <- sort(levels(factor(pData(target_spatialData_GeoDiff)$Region)),decreasing = T)
+
+pData(target_spatialData_GeoDiff)$Region <- factor(pData(target_spatialData_GeoDiff)$Region,l)
+
+diffExpLME4_GeoDiff <- lme4DE(target_spatialData_GeoDiff,assaySlot = "normmat", cores=cores)
+
+diffExpLME4_GeoDiff <- diffExpLME4_GeoDiff[ diffExpLME4_GeoDiff$Contrast %in% contrasts,]
+
+diffExpLME4Tables_GeoDiff <- diffExpLME4_GeoDiff %>%  named_group_split(Contrast) %>% map(as.data.frame)
+
+saveRDS(diffExpLME4_GeoDiff,file="results/diffExpLME4_GeoDiff.RDS")
+
+write_xlsx(diffExpLME4Tables_GeoDiff,path = "results/diffExpLME4_GeoDiff.xlsx" )
+
+
+#model diagnosics example
+checkLME4Model("XRCC2",target_spatialData,~ Region + (1 | PatientID))
+```
+
+### Compare the results by region
+
+```{r}
+
+
+getDiffExpGenes <- function(resultsTable){
+  
+  if("adj.P.Val" %in% colnames(resultsTable)){
+  sig <- resultsTable[ resultsTable$adj.P.Val<=0.05,]
+  return(rownames(sig))
+  } else if ("adjp" %in% colnames(resultsTable)){
+  sig <- resultsTable[ resultsTable$adjp<=0.05,]
+  return(rownames(sig))
+  } else {
+    sig <- resultsTable[ resultsTable$FDR<=0.05 & abs(resultsTable$Estimate)>=log2(1.5),]
+  return(sig$Gene)
+  }
+}
+
+#write out the number of DEGs
+DEGs <- diffExpLME4Tables_Q3 %>% map(getDiffExpGenes) %>% map(length)
+
+main_bar_col <- "violetred4"
+sets_bar_col <- "turquoise4"
+matrix_col <- "slateblue4"
+shade_col <- "wheat4"
+
+
+results <- diffExpLME4Tables_Q3 %>% map(getDiffExpGenes) %>% fromList() %>%
+    upset( 
+        nintersects = 10, 
+        nsets = 6, 
+        order.by = "freq", 
+        decreasing = T, 
+        mb.ratio = c(0.6, 0.4),
+        number.angles = 0, 
+        text.scale = 2, 
+        point.size = 4, 
+        line.size = 2,
+        main.bar.color = main_bar_col,
+        sets.bar.color = sets_bar_col,
+        matrix.color = matrix_col,
+      	shade.color = shade_col
+    )
+saveRDS(results,file="results/Fig3A_UpSetPlot.RDS")
+
+png("figures/DiffExp/upSet_Regions.png",width = 12,height=9,units="in",res=600)
+results
+dev.off()
+results
+
+```
+
+### Volcano Plots
+
+```{r}
+#| label: fig-betweenSlideVolcano
+#| fig-cap: volcano plot of the differential expression for Disease comparisons
+#| fig-width: 8
+#| fig-height: 8
+
+titles <- gsub("Annotation","",contrasts)
+titles <- gsub("Region","",titles)
+titles <- word(titles,2,3)
+
+volcanoPlots <- diffExpLME4Tables_Q3 %>% map2(titles,plotVolcano,foldChangeColumn="Estimate",FDRColumn="FDR",n=6)
+
+saveRDS(volcanoPlots,"results/diseaseVolcanoPlots.RDS")
+
+volcanoPlots <- volcanoPlots%>%  plot_grid(plotlist = . ,ncol = 2,labels = "AUTO",label_size = 20)
+
+# titles <- names(betweenSlideDiffExp)
+# volcanoPlots <- betweenSlideDiffExp %>% map2(titles,plotVolcano) %>% 
+#   plot_grid(plotlist = . ,ncol = 2)
+
+
+save_plot(plot = volcanoPlots, filename = "figures/DiffExp/DiseaseVolcanoPlot.pdf",base_height = 16,base_width = 10,bg="white")
+
+
+
+volcanoPlots
+```
+
+### MA plot
+
+```{r}
+#| warning: false
+#| label: fig-betweenSlideMA
+#| fig-cap: MA plot of the differential expression
+#| fig-width: 9
+#| fig-height: 8
+
+diffExpLME4_Q3$meanExp <- rowMeans(assayDataElement(target_spatialData,
+                                             elt = "log_q"))
+colnames(diffExpLME4_Q3)[2] <- "Subset"
+betweenSlideMA <- MAPlot(diffExpLME4_Q3,FCColumn = "Estimate",FDRColumn = "FDR",n=12)
+
+save_plot(plot = betweenSlideMA, filename = "figures/DiffExp/DiseaseMAPlot.png",base_height = 14,base_width = 9,bg="white")
+
+betweenSlideMA
+```
+
+### Heatmaps
+
+```{r}
+
+pData(target_spatialData)$Tissue <- word(pData(target_spatialData)$Region,2)
+
+
+
+GOI <- diffExpLME4_Q3 %>% group_by(Subset) %>% filter(FDR<=0.05 & abs(Estimate) >= log2(1.5)) %>% slice_min(abs(FDR),n=10) %>% pull(Gene) %>% unique()
+
+
+columns <- c("Segment tags", "Disease","Tissue")
+annotationColours <- mapply(function(column,colourSet) makeColours(pData(target_spatialData)[, column],colourSet),columns,c("nrc","Set2","Set3"),SIMPLIFY = FALSE)
+names(annotationColours) <- columns
+
+column_ha = HeatmapAnnotation( df = pData(target_spatialData)[, columns],col=annotationColours)
+
+mat_scaled <- t(scale(t(log2(assayDataElement(target_spatialData[GOI, ], elt = "q_norm")))))
+
+p <- Heatmap(mat_scaled, name="zscore" ,show_column_names = FALSE, show_row_names = TRUE,top_annotation=column_ha)
+
+png("figures/DiffExp/betweenDiseaseHeatmap.png",width = 7,height=7,res=600,units="in")
+p
+dev.off()
+```
+
+### Region specific heatmaps
+
+```{r}
+ plotRegionHeatmap <- function(region,expData,foldChangeData){
+   
+
+expData <- expData[,order(pData(expData)$Disease)]
+   
+   ht_opt(heatmap_column_names_gp = gpar(fontsize = 18), 
+       heatmap_row_names_gp = gpar(fontsize = 18), 
+       heatmap_column_title_gp = gpar(fontsize = 18),
+       heatmap_row_title_gp = gpar(fontsize = 18),
+       legend_title_gp = gpar(fontsize = 18),
+       legend_labels_gp = gpar(fontsize = 16))
+   
+  foldChangeData <- foldChangeData[ grep(region,foldChangeData$Subset),]
+  region <- word(region,2,3)
+  expData <- expData[,grep(region,pData(expData)$Region)]
+  GOI <- foldChangeData %>% group_by(Subset) %>% filter(FDR<=0.01) %>% slice_min(abs(FDR),n=15) %>% pull(Gene)
+  
+ columns <- c("Disease")
+
+ annotationColours <- makeColours(pData(expData)[, columns],"nrc")
+print(annotationColours)
+annotationColours=list(Disease=annotationColours)
+
+column_ha = HeatmapAnnotation( Disease = pData(expData)[, columns],col=annotationColours,annotation_name_gp = gpar(fontsize = 20))
+
+mat_scaled <- t(scale(t(log2(assayDataElement(expData[GOI, ], elt = "q_norm")))))
+
+p <- Heatmap(mat_scaled, name="zscore" ,show_column_names = FALSE, show_row_names = TRUE,top_annotation=column_ha,cluster_columns=FALSE,column_title = region)
+return(p)
+  
+ }
+pData(target_spatialData)$Tissue <- word(pData(target_spatialData)$Region,2)
+pData(target_spatialData)$Type <- word(pData(target_spatialData)$Region,2,3)
+target_spatialData <- target_spatialData[,order(pData(target_spatialData)$Disease)]
+regions <- unique(pData(target_spatialData)$Region)[1:6]
+regionPlots <- lapply(regions,plotRegionHeatmap,target_spatialData,diffExpLME4_Q3)
+saveRDS(regionPlots,file="results/Fig3B_Heatmap.RDS")
+
+
+
+
+```
+
+::: {.callout-note collapse="true"}
+## Session Info
+
+```{r}
+sessionInfo()
+```
+:::
