@@ -1,3 +1,4 @@
+[![DOI](https://zenodo.org/badge/905216080.svg)](https://doi.org/10.5281/zenodo.14905733)
 # RIF spatial transcriptomics with Nanostring GeoMX
 ![image](https://github.com/user-attachments/assets/29c381a9-8f0a-4d41-9c35-5e6cc5aa64e9)
 
